@@ -18,7 +18,7 @@ class ViewController: UIViewController {
     @IBOutlet weak var logView: UITextView!
     
     /// Client
-    private var swiftStomp : SwiftStomp!
+    private var swiftStomp: SwiftStomp!
     private var messageIndex = 0
 
     override func viewDidLoad() {
@@ -31,7 +31,7 @@ class ViewController: UIViewController {
     private func initStomp(){
         let url = URL(string: "ws://localhost:8080/gs-guide-websocket")!
         
-        self.swiftStomp = SwiftStomp(host: url, headers: ["Authorization" : "Bearer 5c09614a-22dc-4ccd-89c1-5c78338f45e9"])
+        self.swiftStomp = SwiftStomp(host: url, headers: ["Authorization": "Bearer 5c09614a-22dc-4ccd-89c1-5c78338f45e9"])
         self.swiftStomp.enableLogging = true
         self.swiftStomp.delegate = self
         self.swiftStomp.autoReconnect = true
@@ -47,13 +47,13 @@ class ViewController: UIViewController {
     /**
      * Observer functions
      */
-    @objc func appDidBecomeActive(notification : Notification){
+    @objc func appDidBecomeActive(notification: Notification){
         if !self.swiftStomp.isConnected{
             self.swiftStomp.connect()
         }
     }
     
-    @objc func appWillResignActive(notication : Notification){
+    @objc func appWillResignActive(notication: Notification){
         if self.swiftStomp.isConnected{
             self.swiftStomp.disconnect(force: true)
         }
@@ -91,7 +91,7 @@ class ViewController: UIViewController {
     
 }
 
-extension ViewController : SwiftStompDelegate{
+extension ViewController: SwiftStompDelegate{
     
     func onConnect(swiftStomp: SwiftStomp, connectType: StompConnectType) {
         if connectType == .toSocketEndpoint{
@@ -112,7 +112,7 @@ extension ViewController : SwiftStompDelegate{
         }
     }
     
-    func onMessageReceived(swiftStomp: SwiftStomp, message: Any?, messageId: String, destination: String, headers : [String : String]) {
+    func onMessageReceived(swiftStomp: SwiftStomp, message: Any?, messageId: String, destination: String, headers: [String: String]) {
         
         if let message = message as? String{
             print("Message with id `\(messageId)` received at destination `\(destination)`:\n\(message)")
@@ -132,7 +132,7 @@ extension ViewController : SwiftStompDelegate{
         if type == .fromSocket{
             print("Socket error occurred! [\(briefDescription)]")
         } else if type == .fromStomp{
-            print("Stomp error occurred! [\(briefDescription)] : \(String(describing: fullDescription))")
+            print("Stomp error occurred! [\(briefDescription)]: \(String(describing: fullDescription))")
         } else {
             print("Unknown error occured!")
         }

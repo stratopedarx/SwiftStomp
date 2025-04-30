@@ -23,6 +23,8 @@ public struct StompError: Error {
     }
 }
 
+// MARK: - CustomStringConvertible
+
 extension StompError: CustomStringConvertible {
     public var description: String {
         "StompError(\(type)) [receiptId: \(String(describing: receiptId))]: \(localizedDescription)"
