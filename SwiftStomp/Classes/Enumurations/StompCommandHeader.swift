@@ -5,6 +5,8 @@
 //  Created by Ahmad Daneshvar on 5/16/24.
 //
 
+/// Common headers used in STOMP communication frames
+/// [STOMP Headers](https://stomp.github.io/stomp-specification-1.2.html#Frames_and_Headers)
 public enum StompCommonHeader: String {
     case id
     case host
