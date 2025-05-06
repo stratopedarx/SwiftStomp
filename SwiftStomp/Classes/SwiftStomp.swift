@@ -30,6 +30,10 @@ let NULL_CHAR = "\u{00}"
 /// - Custom HTTP and STOMP headers during handshake
 /// - Logging support for debugging protocol activity
 public class SwiftStomp: NSObject {
+    private enum Default {
+        static let reconnectInterval: TimeInterval = 3
+    }
+
     /// The WebSocket endpoint (STOMP broker URL)
     fileprivate var host: URL
     /// HTTP headers to include during the initial WebSocket handshake
@@ -45,7 +49,11 @@ public class SwiftStomp: NSObject {
     fileprivate var acceptVersion = "1.1,1.2"
     /// Current connection status of the STOMP client
     fileprivate var status: StompConnectionStatus = .socketDisconnected
+
     fileprivate var reconnectScheduler: Timer?
+    /// Time interval for automatic reconnect attempts. Can be set externally before calling `connect()`.
+    public var reconnectInterval = Default.reconnectInterval
+
     fileprivate var reachability: Reachability?
     fileprivate var hostIsReachabile = true
 
@@ -356,6 +364,7 @@ fileprivate extension SwiftStomp{
         return headersToSend
     }
 
+    /// Schedules a timer to attempt automatic reconnection to the STOMP server
     func scheduleConnector() {
         self.stompLog(type: .info, message: "Scheduling connector")
 
@@ -367,7 +376,10 @@ fileprivate extension SwiftStomp{
         try? self.reachability?.startNotifier()
 
         DispatchQueue.main.async { [weak self] in
-            self?.reconnectScheduler = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] timer in
+            self?.reconnectScheduler = Timer.scheduledTimer(
+                withTimeInterval: self?.reconnectInterval ?? Default.reconnectInterval,
+                repeats: true
+            ) { [weak self] timer in
                 guard let self = self else {
                     return
                 }
