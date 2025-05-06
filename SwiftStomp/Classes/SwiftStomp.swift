@@ -136,7 +136,7 @@ public class SwiftStomp: NSObject {
 
 /// Public Operating functions
 public extension SwiftStomp {
-    func connect(timeout: TimeInterval = 5, acceptVersion: String = "1.1,1.2", autoReconnect: Bool = false) {
+    func connect(timeout: TimeInterval = 5, acceptVersion: String, autoReconnect: Bool = false) {
 
         self.stompLog(type: .info, message: "Connecting...  autoReconnect: \(autoReconnect)")
 
@@ -379,7 +379,7 @@ fileprivate extension SwiftStomp{
                     return
                 }
 
-                self.connect(autoReconnect: self.autoReconnect)
+                self.connect(acceptVersion: self.acceptVersion, autoReconnect: self.autoReconnect)
             }
         }
     }
