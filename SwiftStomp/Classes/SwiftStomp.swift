@@ -8,6 +8,7 @@
 
 import Combine
 import Foundation
+import Network
 import OSLog
 import Reachability
 
@@ -112,17 +113,37 @@ public class SwiftStomp: NSObject {
     public var autoReconnect = false
 
     /// Creates a new STOMP client with the given host and optional headers
-    public init (host: URL, headers: [String: String]? = nil, httpConnectionHeaders: [String: String]? = nil) {
+    public init (host: URL, headers: [String: String]? = nil, httpConnectionHeaders: [String: String]? = nil, proxyMode: ProxyMode? = nil) {
         self.host = host
         self.stompConnectionHeaders = headers
         self.httpConnectionHeaders = httpConnectionHeaders
         super.init()
-        self.urlSession = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
+
+        self.urlSession = URLSession(configuration: createSessionConfiguration(proxyMode: proxyMode), delegate: self, delegateQueue: nil)
         self.initReachability()
     }
 
     deinit {
         disconnect(force: true)
+    }
+
+    private func createSessionConfiguration(proxyMode: ProxyMode?) -> URLSessionConfiguration {
+        let sessionConfig = URLSessionConfiguration.default
+
+        if #available(iOS 17.0, *),
+           let proxyMode = proxyMode {
+            switch proxyMode {
+            case .proxyman(let host, let port):
+                let socksv5Proxy = NWEndpoint.hostPort(
+                    host: NWEndpoint.Host(host),
+                    port: NWEndpoint.Port(integerLiteral: NWEndpoint.Port.IntegerLiteralType(port))
+                )
+                let proxyConfig = ProxyConfiguration(socksv5Proxy: socksv5Proxy)
+                sessionConfig.proxyConfigurations = [proxyConfig]
+            }
+        }
+
+        return sessionConfig
     }
 
     private func initReachability() {
@@ -707,6 +728,7 @@ extension SwiftStomp: URLSessionWebSocketDelegate {
 
 // MARK: - SwiftStomp delegate
 
+/// A delegate protocol for receiving events from a SwiftStomp client.
 public protocol SwiftStompDelegate: AnyObject {
 
     func onConnect(swiftStomp: SwiftStomp, connectType: StompConnectType)
@@ -718,4 +740,13 @@ public protocol SwiftStompDelegate: AnyObject {
     func onReceipt(swiftStomp: SwiftStomp, receiptId: String)
 
     func onError(swiftStomp: SwiftStomp, briefDescription: String, fullDescription: String?, receiptId: String?, type: StompErrorType)
+}
+
+// MARK: - ProxyMode
+
+/// Defines proxy configuration modes for the SwiftStomp client.
+/// Used to optionally route network traffic through a proxy server, such as for debugging WebSocket connections.
+public enum ProxyMode {
+    /// [Capture and debug Websocket from iOS](https://docs.proxyman.com/advanced-features/websocket)
+    case proxyman(host: String = "localhost", port: Int16 = 8889)
 }
