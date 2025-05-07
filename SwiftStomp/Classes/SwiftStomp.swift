@@ -56,9 +56,9 @@ public class SwiftStomp: NSObject {
     /// The WebSocket endpoint (STOMP broker URL)
     fileprivate var host: URL
     /// HTTP headers to include during the initial WebSocket handshake
-    fileprivate var httpConnectionHeaders: [String: String]?
+    fileprivate var httpConnectionHeaders: [String: String]
     /// STOMP-specific headers used during the STOMP CONNECT frame
-    fileprivate var stompConnectionHeaders: [String: String]?
+    fileprivate var stompConnectionHeaders: [String: String]
 
     /// WebSocket infrastructure using URLSession
     fileprivate var urlSession: URLSession?
@@ -153,7 +153,7 @@ public class SwiftStomp: NSObject {
     public var autoReconnect = false
 
     /// Creates a new STOMP client with the given host and optional headers
-    public init (host: URL, headers: [String: String]? = nil, httpConnectionHeaders: [String: String]? = nil, proxyMode: ProxyMode? = nil) {
+    public init (host: URL, headers: [String: String] = [:], httpConnectionHeaders: [String: String] = [:], proxyMode: ProxyMode? = nil) {
         self.host = host
         self.stompConnectionHeaders = headers
         self.httpConnectionHeaders = httpConnectionHeaders
@@ -225,10 +225,8 @@ public extension SwiftStomp {
         //** Time interval
         urlRequest.timeoutInterval = timeout
 
-        if let httpConnectionHeaders {
-            for header in httpConnectionHeaders {
-                urlRequest.addValue(header.value, forHTTPHeaderField: header.key)
-            }
+        for header in httpConnectionHeaders {
+            urlRequest.addValue(header.value, forHTTPHeaderField: header.key)
         }
 
         self.webSocketTask = urlSession?.webSocketTask(with: urlRequest)
@@ -489,13 +487,11 @@ private extension SwiftStomp {
             .get
 
         //** Append connection headers
-        if let stompConnectionHeaders = self.stompConnectionHeaders{
-            for (hKey, hVal) in stompConnectionHeaders{
-                headers[hKey] = hVal
-            }
+        for (hKey, hVal) in stompConnectionHeaders{
+            headers[hKey] = hVal
         }
 
-        saveHeartbeatClientSettings(connectedHeaders: stompConnectionHeaders ?? [:])
+        saveHeartbeatClientSettings(connectedHeaders: stompConnectionHeaders)
 
         self.sendFrame(frame: StompFrame(name: .connect, headers: headers))
     }
