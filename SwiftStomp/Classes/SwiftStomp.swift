@@ -12,8 +12,18 @@ import Network
 import OSLog
 import Reachability
 
-/// Null character used by STOMP protocol to terminate a frame
-let NULL_CHAR = "\u{00}"
+public enum StompConstants {
+    /// Null character used by STOMP protocol to terminate a frame
+    static let nullChar = "\u{00}"
+
+    /// The heartbeat signal (`\n`) is a single newline character used by both the server and client
+    /// as a lightweight ping mechanism to maintain the STOMP connection's liveness.
+    ///
+    /// - When received alone from the server, it is interpreted as a **server-side heartbeat ping**.
+    /// - The client also **sends** this symbol periodically to the server as part of the heartbeat mechanism.
+    static let heartbeatSymbol = "\n"
+
+}
 
 /// A high-level STOMP (Simple Text Oriented Messaging Protocol) client built on top of WebSockets using `URLSessionWebSocketTask`.
 ///
@@ -31,6 +41,14 @@ let NULL_CHAR = "\u{00}"
 /// - Custom HTTP and STOMP headers during handshake
 /// - Logging support for debugging protocol activity
 public class SwiftStomp: NSObject {
+    private enum Constants {
+        static let heartbeatHeaderKey = StompCommonHeader.heartBeat.rawValue
+
+        /// The default interval (in milliseconds) for sending heartbeats to the server,
+        /// used when the server does not provide specific heartbeat settings.
+        static let defaultHeartbeatInterval = 10_000
+    }
+    
     private enum Default {
         static let reconnectInterval: TimeInterval = 3
     }
@@ -57,6 +75,28 @@ public class SwiftStomp: NSObject {
 
     fileprivate var reachability: Reachability?
     fileprivate var hostIsReachabile = true
+
+    // MARK: Heartbeat peroperties
+
+    /// Determines whether the client should automatically send heartbeat pings to the server using a timer
+    private var isAutoHeartbeatEnable = false
+
+    /// The interval (in seconds) at which the client *wants* to send heartbeat pings to the server.
+    /// This value is negotiated during the STOMP handshake.
+    private var heartbeatClientIntervalSeconds: TimeInterval = 0
+
+    /// The interval (in seconds) at which the server *expects* heartbeat pings from the client.
+    /// This value is provided by the server during the STOMP handshake.
+    private var heartbeatServerIntervalSeconds: TimeInterval = 0
+
+    /// The actual interval at which the client will send heartbeat pings to the server.
+    /// This is determined as the **maximum** of `heartbeatClientIntervalSeconds` and `heartbeatServerIntervalSeconds`.
+    private var heartbeatToServerInterval: TimeInterval {
+        max(heartbeatClientIntervalSeconds, heartbeatServerIntervalSeconds)
+    }
+
+    /// The timer responsible for triggering automatic heartbeat pings from the client to the server
+    private var heartbeatTimer: Timer?
 
     // MARK: Auto ping peroperties
 
@@ -350,10 +390,20 @@ public extension SwiftStomp {
         self.pingTimer?.invalidate()
     }
 
+    /// Toggles automatic heartbeat pings to the server.
+    /// If enabled, a timer sends heartbeats at the negotiated interval.
+    func toggleAutoHeartbeat(_ enabled: Bool) {
+        stompLog(type: .info, message: "Auto Heartbeat sending set to: \(enabled)")
+        isAutoHeartbeatEnable = enabled
+        if !enabled {
+            heartbeatTimer?.invalidate()
+        }
+        resetHeartbeatTimer()
+    }
 }
 
 /// Helper functions
-fileprivate extension SwiftStomp{
+fileprivate extension SwiftStomp {
     func stompLog(type: StompLogType, message: String) {
         guard enableLogging else { return }
 
@@ -430,7 +480,7 @@ fileprivate extension SwiftStomp{
 }
 
 /// Back-Operating functions
-fileprivate extension SwiftStomp{
+private extension SwiftStomp {
     func stompConnect() {
 
         //** Add headers
@@ -445,7 +495,7 @@ fileprivate extension SwiftStomp{
             }
         }
 
-
+        saveHeartbeatClientSettings(connectedHeaders: stompConnectionHeaders ?? [:])
 
         self.sendFrame(frame: StompFrame(name: .connect, headers: headers))
     }
@@ -554,6 +604,8 @@ fileprivate extension SwiftStomp{
 
         case .connected:
             self.status = .fullyConnected
+            self.saveHeartbeatServerSettings(connectedHeaders: frame.headers)
+            self.resetHeartbeatTimer()
 
             stompLog(type: .info, message: "Stomp: Connected")
 
@@ -562,6 +614,8 @@ fileprivate extension SwiftStomp{
                 self.delegate?.onConnect(swiftStomp: self, connectType: .toStomp)
                 self._eventsUpstream.send(.connected(type: .toStomp))
             }
+        case .serverPing:
+            stompLog(type: .info, message: "Stomp: Server Ping")
         default:
             stompLog(type: .info, message: "Stomp: Un-Processable content: \(text)")
         }
@@ -620,6 +674,97 @@ fileprivate extension SwiftStomp{
                 self?.ping()
             }
         }
+    }
+
+    /// Resets the heartbeat timer if auto-heartbeat is enabled and the connection status is `.fullyConnected`.
+    /// Ensures only one valid timer is active. When triggered, the timer will send heartbeat signals at a regular interval.
+    func resetHeartbeatTimer() {
+        guard isAutoHeartbeatEnable else {
+            stompLog(type: .info, message: "Heartbeat timer not restarted because auto-heartbeat is disabled")
+            return
+        }
+
+        guard status == .fullyConnected else {
+            stompLog(type: .info, message: "Heartbeat timer not restarted because connection is not fullyConnected")
+            return
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                return
+            }
+
+            if let heartbeatTimer = self.heartbeatTimer, heartbeatTimer.isValid {
+                heartbeatTimer.invalidate()
+            }
+
+            stompLog(type: .info, message: "Heartbeat timer started")
+            self.heartbeatTimer = Timer.scheduledTimer(
+                withTimeInterval: self.heartbeatToServerInterval,
+                repeats: true
+            ) { [weak self] _ in
+                self?.sendHeartbeat()
+            }
+        }
+    }
+
+    /// Sends a heartbeat signal to the server.
+    /// This is used to keep the connection alive and inform the server that the client is still active.
+    func sendHeartbeat() {
+        stompLog(type: .info, message: "Heartbeat sent to server")
+        webSocketTask?.send(.string(StompConstants.heartbeatSymbol)) { error in
+            if let error = error {
+                self.stompLog(type: .stompError, message: "Error sending heartbeat: \(error)")
+            }
+        }
+    }
+
+    /// Parses and stores the heartbeat interval expected by the server based on the `heart-beat` header.
+    /// - Parameter connectedHeaders: Dictionary containing connection headers from the server.
+    func saveHeartbeatServerSettings(connectedHeaders: [String: String]) {
+        guard let heartbeatValues = connectedHeaders[Constants.heartbeatHeaderKey],
+              let heartbeatValueMillisecondsString = heartbeatValues.split(separator: ",").last,
+              let heartbeatValueMilliseconds = Int(heartbeatValueMillisecondsString) else {
+            heartbeatServerIntervalSeconds = makeSeconds(fromMilliseconds: Constants.defaultHeartbeatInterval)
+            stompLog(
+                type: .info,
+                message: "heartbeatServerIntervalSeconds was set to default: \(Constants.defaultHeartbeatInterval) ms"
+            )
+            return
+        }
+
+        heartbeatServerIntervalSeconds = makeSeconds(fromMilliseconds: heartbeatValueMilliseconds)
+        stompLog(
+            type: .info,
+            message: "New heartbeatServerIntervalSeconds set to: \(heartbeatServerIntervalSeconds) seconds"
+        )
+    }
+
+    /// Saves the client-preferred heartbeat interval from the `heart-beat` header.
+    /// - Parameter heartbeatHeader: The value of the `heart-beat` header, expected in format "client,server"
+    func saveHeartbeatClientSettings(connectedHeaders: [String: String]) {
+        guard let heartbeatValues = connectedHeaders[Constants.heartbeatHeaderKey],
+              let heartbeatValueMillisecondsString = heartbeatValues.split(separator: ",").first,
+              let heartbeatValueMilliseconds = Int(heartbeatValueMillisecondsString) else {
+            heartbeatClientIntervalSeconds = makeSeconds(fromMilliseconds: Constants.defaultHeartbeatInterval)
+            stompLog(
+                type: .info,
+                message: "heartbeatClientIntervalSeconds set to default: \(Constants.defaultHeartbeatInterval) ms"
+            )
+            return
+        }
+
+        heartbeatClientIntervalSeconds = makeSeconds(fromMilliseconds: heartbeatValueMilliseconds)
+        stompLog(
+            type: .info,
+            message: "heartbeatClientIntervalSeconds updated from header: \(heartbeatValueMilliseconds) ms"
+        )
+    }
+
+    /// Converts milliseconds to seconds as `TimeInterval`.
+    @inline(__always)
+    func makeSeconds(fromMilliseconds milliseconds: Int) -> TimeInterval {
+        TimeInterval(milliseconds) / 1000
     }
 }
 
@@ -707,6 +852,7 @@ extension SwiftStomp: URLSessionWebSocketDelegate {
 
     private func handleDisconnect() {
         pingTimer?.invalidate()
+        heartbeatTimer?.invalidate()
         self.invalidateConnector()
 
         self.webSocketTask?.cancel(with: .goingAway, reason: nil)

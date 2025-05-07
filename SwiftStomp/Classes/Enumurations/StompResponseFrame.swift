@@ -12,4 +12,5 @@ public enum StompResponseFrame: String {
     case message = "MESSAGE"
     case receipt = "RECEIPT"
     case error = "ERROR"
+    case serverPing = "SERVER_PING"
 }

@@ -82,7 +82,7 @@ struct StompFrame<T: RawRepresentable> where T.RawValue == String {
         }
         
         // End with NULL terminator
-        frame += NULL_CHAR
+        frame += StompConstants.nullChar
         
         return frame
     }
@@ -91,6 +91,13 @@ struct StompFrame<T: RawRepresentable> where T.RawValue == String {
     /// - Parameter frame: A full STOMP string with command, headers, and body
     /// - Throws: If parsing the frame fails
     mutating func deserialize(frame: String) throws {
+        // If the frame consists of only a single newline character "\n", interpret it as a Heartbeat from the server
+        if frame == StompConstants.heartbeatSymbol {
+            name = (StompResponseFrame.serverPing as! T)
+            body = frame
+            return
+        }
+        
         var lines = frame.components(separatedBy: "\n")
         
         // ** Remove first if was empty string
