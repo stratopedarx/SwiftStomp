@@ -30,7 +30,7 @@ extension ContentView {
         @MainActor
         func connect() {
             if !swiftStomp.isConnected{
-                swiftStomp.connect()
+                swiftStomp.connect(acceptVersion: "1.1,1.2")
             }
         }
         

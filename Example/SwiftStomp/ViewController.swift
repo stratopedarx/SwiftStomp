@@ -49,7 +49,7 @@ class ViewController: UIViewController {
      */
     @objc func appDidBecomeActive(notification: Notification){
         if !self.swiftStomp.isConnected{
-            self.swiftStomp.connect()
+            self.swiftStomp.connect(acceptVersion: "1.1,1.2")
         }
     }
     
@@ -65,7 +65,7 @@ class ViewController: UIViewController {
 
     @IBAction func triggerConnect(_ sender: Any) {
         if !self.swiftStomp.isConnected{
-            self.swiftStomp.connect()
+            self.swiftStomp.connect(acceptVersion: "1.1,1.2")
         }
         
     }
