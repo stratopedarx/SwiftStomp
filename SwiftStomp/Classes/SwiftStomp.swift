@@ -153,13 +153,13 @@ public class SwiftStomp: NSObject {
     public var autoReconnect = false
 
     /// Creates a new STOMP client with the given host and optional headers
-    public init (host: URL, headers: [String: String] = [:], httpConnectionHeaders: [String: String] = [:], proxyMode: ProxyMode? = nil) {
+    public init (host: URL, headers: [String: String] = [:], httpConnectionHeaders: [String: String] = [:], proxyMode: DebugProxyMode? = nil) {
         self.host = host
         self.stompConnectionHeaders = headers
         self.httpConnectionHeaders = httpConnectionHeaders
         super.init()
 
-        self.urlSession = URLSession(configuration: createSessionConfiguration(proxyMode: proxyMode), delegate: self, delegateQueue: nil)
+        self.urlSession = URLSession(configuration: makeSessionConfiguration(proxyMode: proxyMode), delegate: self, delegateQueue: nil)
         self.initReachability()
     }
 
@@ -167,7 +167,7 @@ public class SwiftStomp: NSObject {
         disconnect(force: true)
     }
 
-    private func createSessionConfiguration(proxyMode: ProxyMode?) -> URLSessionConfiguration {
+    private func makeSessionConfiguration(proxyMode: DebugProxyMode?) -> URLSessionConfiguration {
         let sessionConfig = URLSessionConfiguration.default
 
         if #available(iOS 17.0, *),
@@ -884,11 +884,11 @@ public protocol SwiftStompDelegate: AnyObject {
     func onError(swiftStomp: SwiftStomp, briefDescription: String, fullDescription: String?, receiptId: String?, type: StompErrorType)
 }
 
-// MARK: - ProxyMode
+// MARK: - DebugProxyMode
 
 /// Defines proxy configuration modes for the SwiftStomp client.
 /// Used to optionally route network traffic through a proxy server, such as for debugging WebSocket connections.
-public enum ProxyMode {
+public enum DebugProxyMode {
     /// [Capture and debug Websocket from iOS](https://docs.proxyman.com/advanced-features/websocket)
     case proxyman(host: String = "localhost", port: Int16 = 8889)
 }
