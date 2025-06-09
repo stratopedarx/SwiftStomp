@@ -153,6 +153,18 @@ public class SwiftStomp: NSObject {
     public var autoReconnect = false
 
     /// Creates a new STOMP client with the given host and optional headers
+    public init (host: URL, headers: [String: String] = [:], httpConnectionHeaders: [String: String] = [:]) {
+        self.host = host
+        self.stompConnectionHeaders = headers
+        self.httpConnectionHeaders = httpConnectionHeaders
+        super.init()
+
+        self.urlSession = URLSession(configuration: makeSessionConfiguration(proxyMode: nil), delegate: self, delegateQueue: nil)
+        self.initReachability()
+    }
+
+    /// Creates a new STOMP client with the given host and optional headers and proxy
+    @available(iOS 17, *)
     public init (host: URL, headers: [String: String] = [:], httpConnectionHeaders: [String: String] = [:], proxyMode: DebugProxyMode? = nil) {
         self.host = host
         self.stompConnectionHeaders = headers
