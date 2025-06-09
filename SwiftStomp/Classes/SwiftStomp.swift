@@ -159,13 +159,13 @@ public class SwiftStomp: NSObject {
         self.httpConnectionHeaders = httpConnectionHeaders
         super.init()
 
-        self.urlSession = URLSession(configuration: makeSessionConfiguration(proxyMode: nil), delegate: self, delegateQueue: nil)
+        self.urlSession = URLSession(configuration: makeSessionConfiguration(proxyMode: .disable), delegate: self, delegateQueue: nil)
         self.initReachability()
     }
 
-    /// Creates a new STOMP client with the given host and optional headers and proxy
+    /// Creates a new STOMP client with the given host, optional headers and proxy
     @available(iOS 17, *)
-    public init (host: URL, headers: [String: String] = [:], httpConnectionHeaders: [String: String] = [:], proxyMode: DebugProxyMode? = nil) {
+    public init (host: URL, headers: [String: String] = [:], httpConnectionHeaders: [String: String] = [:], proxyMode: DebugProxyMode = .disable) {
         self.host = host
         self.stompConnectionHeaders = headers
         self.httpConnectionHeaders = httpConnectionHeaders
@@ -179,11 +179,10 @@ public class SwiftStomp: NSObject {
         disconnect(force: true)
     }
 
-    private func makeSessionConfiguration(proxyMode: DebugProxyMode?) -> URLSessionConfiguration {
+    private func makeSessionConfiguration(proxyMode: DebugProxyMode) -> URLSessionConfiguration {
         let sessionConfig = URLSessionConfiguration.default
-
-        if #available(iOS 17.0, *),
-           let proxyMode = proxyMode {
+        
+        if #available(iOS 17.0, *) {
             switch proxyMode {
             case .proxyman(let host, let port):
                 let socksv5Proxy = NWEndpoint.hostPort(
@@ -192,6 +191,8 @@ public class SwiftStomp: NSObject {
                 )
                 let proxyConfig = ProxyConfiguration(socksv5Proxy: socksv5Proxy)
                 sessionConfig.proxyConfigurations = [proxyConfig]
+            case .disable:
+                break
             }
         }
 
@@ -903,4 +904,6 @@ public protocol SwiftStompDelegate: AnyObject {
 public enum DebugProxyMode {
     /// [Capture and debug Websocket from iOS](https://docs.proxyman.com/advanced-features/websocket)
     case proxyman(host: String = "localhost", port: Int16 = 8889)
+    /// Disables proxying
+    case disable
 }
