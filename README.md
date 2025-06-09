@@ -64,15 +64,15 @@ self.swiftStomp.connect() //< Connect
 ### Delegate
 Implement all delegate methods to handle all STOMP events!
 ```swift
-func onConnect(swiftStomp : SwiftStomp, connectType : StompConnectType)
+func onConnect(swiftStomp: SwiftStomp, connectType: StompConnectType)
     
-func onDisconnect(swiftStomp : SwiftStomp, disconnectType : StompDisconnectType)
+func onDisconnect(swiftStomp: SwiftStomp, disconnectType: StompDisconnectType)
 
-func onMessageReceived(swiftStomp: SwiftStomp, message: Any?, messageId: String, destination: String, headers : [String : String])
+func onMessageReceived(swiftStomp: SwiftStomp, message: Any?, messageId: String, destination: String, headers: [String: String])
 
-func onReceipt(swiftStomp : SwiftStomp, receiptId : String)
+func onReceipt(swiftStomp: SwiftStomp, receiptId: String)
 
-func onError(swiftStomp : SwiftStomp, briefDescription : String, fullDescription : String?, receiptId : String?, type : StompErrorType)
+func onError(swiftStomp: SwiftStomp, briefDescription: String, fullDescription: String?, receiptId: String?, type: StompErrorType)
 ```
 
 ### Upstreams

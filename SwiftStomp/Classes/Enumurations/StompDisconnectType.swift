@@ -5,7 +5,7 @@
 //  Created by Ahmad Daneshvar on 5/16/24.
 //
 
-public enum StompDisconnectType{
+public enum StompDisconnectType {
     case fromSocket
     case fromStomp
 }

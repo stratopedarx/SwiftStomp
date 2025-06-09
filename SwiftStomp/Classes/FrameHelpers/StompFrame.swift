@@ -7,7 +7,7 @@
 
 import Foundation
 
-internal struct StompFrame<T: RawRepresentable> where T.RawValue == String {
+struct StompFrame<T: RawRepresentable> where T.RawValue == String {
     var name: T!
     var headers = [String: String]()
     var body: Any = ""

@@ -6,33 +6,34 @@
 //  Copyright © 2020 Ahmad Daneshvar. All rights reserved.
 //
 
+import Combine
 import Foundation
 import OSLog
 import Reachability
-import Combine
 
 let NULL_CHAR = "\u{00}"
 
 
 // MARK: - SwiftStomp
+
 public class SwiftStomp: NSObject {
 
-    fileprivate var host : URL
-    fileprivate var httpConnectionHeaders : [String : String]?
-    fileprivate var stompConnectionHeaders : [String : String]?
+    fileprivate var host: URL
+    fileprivate var httpConnectionHeaders: [String: String]?
+    fileprivate var stompConnectionHeaders: [String: String]?
 
     fileprivate var urlSession: URLSession?
     fileprivate var webSocketTask: URLSessionWebSocketTask?
 
     fileprivate var acceptVersion = "1.1,1.2"
-    fileprivate var status : StompConnectionStatus = .socketDisconnected
-    fileprivate var reconnectScheduler : Timer?
+    fileprivate var status: StompConnectionStatus = .socketDisconnected
+    fileprivate var reconnectScheduler: Timer?
     fileprivate var reconnectTryCount = 0
-    fileprivate var reachability : Reachability?
+    fileprivate var reachability: Reachability?
     fileprivate var hostIsReachabile = true
 
     /// Auto ping peroperties
-    fileprivate var pingTimer : Timer?
+    fileprivate var pingTimer: Timer?
     fileprivate var pingInterval: TimeInterval = 10 //< 10 Seconds
     fileprivate var autoPingEnabled = false
 
@@ -56,10 +57,10 @@ public class SwiftStomp: NSObject {
     }
     
     public var enableLogging = false
-    public var isConnected : Bool {
+    public var isConnected: Bool {
         return self.status == .fullyConnected
     }
-    public var connectionStatus : StompConnectionStatus{
+    public var connectionStatus: StompConnectionStatus{
         return self.status
     }
 
@@ -80,7 +81,7 @@ public class SwiftStomp: NSObject {
 
     public var autoReconnect = false
 
-    public init (host : URL, headers : [String : String]? = nil, httpConnectionHeaders : [String : String]? = nil){
+    public init (host: URL, headers: [String: String]? = nil, httpConnectionHeaders: [String: String]? = nil){
         self.host = host
         self.stompConnectionHeaders = headers
         self.httpConnectionHeaders = httpConnectionHeaders
@@ -112,7 +113,7 @@ public class SwiftStomp: NSObject {
 
 /// Public Operating functions
 public extension SwiftStomp{
-    func connect(timeout : TimeInterval = 5, acceptVersion : String = "1.1,1.2", autoReconnect : Bool = false){
+    func connect(timeout: TimeInterval = 5, acceptVersion: String = "1.1,1.2", autoReconnect: Bool = false){
 
         self.stompLog(type: .info, message: "Connecting...  autoReconnect: \(autoReconnect)")
 
@@ -146,7 +147,7 @@ public extension SwiftStomp{
         self.status = .connecting
     }
 
-    func disconnect(force : Bool = false){
+    func disconnect(force: Bool = false){
 
         self.autoReconnect = false
         self.disableAutoPing()
@@ -159,7 +160,7 @@ public extension SwiftStomp{
         }
     }
 
-    func subscribe(to destination : String, mode : StompAckMode = .auto, headers : [String : String]? = nil){
+    func subscribe(to destination: String, mode: StompAckMode = .auto, headers: [String: String]? = nil){
         var headersToSend = StompHeaderBuilder
             .add(key: .destination, value: destination)
             .add(key: .id, value: destination)
@@ -174,7 +175,7 @@ public extension SwiftStomp{
         self.sendFrame(frame: StompFrame(name: .subscribe, headers: headersToSend))
     }
 
-    func unsubscribe(from destination : String, mode : StompAckMode = .auto, headers : [String : String]? = nil){
+    func unsubscribe(from destination: String, mode: StompAckMode = .auto, headers: [String: String]? = nil){
         var headersToSend = StompHeaderBuilder
             .add(key: .id, value: destination)
             .get
@@ -187,25 +188,25 @@ public extension SwiftStomp{
         self.sendFrame(frame: StompFrame(name: .unsubscribe, headers: headersToSend))
     }
 
-    func send(body : String, to : String, receiptId : String? = nil, headers : [String : String]? = nil){
+    func send(body: String, to: String, receiptId: String? = nil, headers: [String: String]? = nil){
         let headers = prepareHeadersForSend(to: to, receiptId: receiptId, headers: headers)
 
         self.sendFrame(frame: StompFrame(name: .send, headers: headers, stringBody: body))
     }
 
-    func send(body : Data, to : String, receiptId : String? = nil, headers : [String : String]? = nil){
+    func send(body: Data, to: String, receiptId: String? = nil, headers: [String: String]? = nil){
         let headers = prepareHeadersForSend(to: to, receiptId: receiptId, headers: headers)
 
         self.sendFrame(frame: StompFrame(name: .send, headers: headers, dataBody: body))
     }
 
-    func send <T : Encodable> (body : T, to : String, receiptId : String? = nil, headers : [String : String]? = nil, jsonDateEncodingStrategy : JSONEncoder.DateEncodingStrategy = .iso8601){
+    func send <T: Encodable> (body: T, to: String, receiptId: String? = nil, headers: [String: String]? = nil, jsonDateEncodingStrategy: JSONEncoder.DateEncodingStrategy = .iso8601){
         let headers = prepareHeadersForSend(to: to, receiptId: receiptId, headers: headers)
 
         self.sendFrame(frame: StompFrame(name: .send, headers: headers, encodableBody: body, jsonDateEncodingStrategy: jsonDateEncodingStrategy))
     }
 
-    func ack(messageId : String, transaction : String? = nil){
+    func ack(messageId: String, transaction: String? = nil){
         let headerBuilder = StompHeaderBuilder
             .add(key: .id, value: messageId)
 
@@ -218,7 +219,7 @@ public extension SwiftStomp{
         self.sendFrame(frame: StompFrame(name: .ack, headers: headers))
     }
 
-    func nack(messageId : String, transaction : String? = nil){
+    func nack(messageId: String, transaction: String? = nil){
         let headerBuilder = StompHeaderBuilder
             .add(key: .id, value: messageId)
 
@@ -231,7 +232,7 @@ public extension SwiftStomp{
         self.sendFrame(frame: StompFrame(name: .nack, headers: headers))
     }
 
-    func begin(transactionName : String){
+    func begin(transactionName: String){
         let headers = StompHeaderBuilder
             .add(key: .transaction, value: transactionName)
             .get
@@ -239,7 +240,7 @@ public extension SwiftStomp{
         self.sendFrame(frame: StompFrame(name: .begin, headers: headers))
     }
 
-    func commit(transactionName : String){
+    func commit(transactionName: String){
         let headers = StompHeaderBuilder
             .add(key: .transaction, value: transactionName)
             .get
@@ -247,7 +248,7 @@ public extension SwiftStomp{
         self.sendFrame(frame: StompFrame(name: .commit, headers: headers))
     }
 
-    func abort(transactionName : String){
+    func abort(transactionName: String){
         let headers = StompHeaderBuilder
             .add(key: .transaction, value: transactionName)
             .get
@@ -301,17 +302,17 @@ public extension SwiftStomp{
 
 /// Helper functions
 fileprivate extension SwiftStomp{
-    func stompLog(type : StompLogType, message : String){
+    func stompLog(type: StompLogType, message: String){
         guard enableLogging else { return }
 
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
 
         let timestamp = formatter.string(from: Date())
-        os_log(type == .info ? .info : .error, "%s SwiftStomp [%s]: %s", timestamp, type.rawValue, message)
+        os_log(type == .info ? .info: .error, "%s SwiftStomp [%s]: %s", timestamp, type.rawValue, message)
     }
 
-    func prepareHeadersForSend(to : String, receiptId : String? = nil, headers : [String : String]? = nil) -> [String : String]{
+    func prepareHeadersForSend(to: String, receiptId: String? = nil, headers: [String: String]? = nil) -> [String: String]{
 
         let headerBuilder = StompHeaderBuilder
         .add(key: .destination, value: to)
@@ -402,8 +403,8 @@ fileprivate extension SwiftStomp{
         self.sendFrame(frame: StompFrame(name: .disconnect, headers: headers))
     }
 
-    func processReceivedSocketText(text : String){
-        var frame : StompFrame<StompResponseFrame>
+    func processReceivedSocketText(text: String){
+        var frame: StompFrame<StompResponseFrame>
 
         //** Deserialize frame
         do{
@@ -510,7 +511,7 @@ fileprivate extension SwiftStomp{
         }
     }
 
-    func sendFrame(frame : StompFrame<StompRequestFrame>, completion : (() -> ())? = nil){
+    func sendFrame(frame: StompFrame<StompRequestFrame>, completion: (() -> ())? = nil){
         guard let webSocketTask else {
             stompLog(type: .info, message: "Unable to send frame \(frame.name.rawValue): WebSocket is not connected!")
             return
@@ -600,6 +601,8 @@ extension SwiftStomp {
     }
 }
 
+// MARK: - URLSessionWebSocketDelegate
+
 extension SwiftStomp: URLSessionWebSocketDelegate {
 
     public func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didOpenWithProtocol protocol: String?) {
@@ -668,15 +671,16 @@ extension SwiftStomp: URLSessionWebSocketDelegate {
 }
 
 // MARK: - SwiftStomp delegate
-public protocol SwiftStompDelegate: AnyObject{
 
-    func onConnect(swiftStomp : SwiftStomp, connectType : StompConnectType)
+public protocol SwiftStompDelegate: AnyObject {
 
-    func onDisconnect(swiftStomp : SwiftStomp, disconnectType : StompDisconnectType)
+    func onConnect(swiftStomp: SwiftStomp, connectType: StompConnectType)
 
-    func onMessageReceived(swiftStomp : SwiftStomp, message : Any?, messageId : String, destination : String, headers : [String : String])
+    func onDisconnect(swiftStomp: SwiftStomp, disconnectType: StompDisconnectType)
 
-    func onReceipt(swiftStomp : SwiftStomp, receiptId : String)
+    func onMessageReceived(swiftStomp: SwiftStomp, message: Any?, messageId: String, destination: String, headers: [String: String])
 
-    func onError(swiftStomp : SwiftStomp, briefDescription : String, fullDescription : String?, receiptId : String?, type : StompErrorType)
+    func onReceipt(swiftStomp: SwiftStomp, receiptId: String)
+
+    func onError(swiftStomp: SwiftStomp, briefDescription: String, fullDescription: String?, receiptId: String?, type: StompErrorType)
 }
