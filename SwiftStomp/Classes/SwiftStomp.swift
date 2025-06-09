@@ -50,7 +50,7 @@ public class SwiftStomp: NSObject {
     }
     
     private enum Default {
-        static let reconnectInterval: TimeInterval = 3
+        static let reconnectSchedulerInterval: TimeInterval = 3
     }
 
     /// The WebSocket endpoint (STOMP broker URL)
@@ -71,7 +71,7 @@ public class SwiftStomp: NSObject {
 
     fileprivate var reconnectScheduler: Timer?
     /// Time interval for automatic reconnect attempts. Can be set externally before calling `connect()`.
-    public var reconnectInterval = Default.reconnectInterval
+    public var reconnectSchedulerInterval = Default.reconnectSchedulerInterval
 
     fileprivate var reachability: Reachability?
     fileprivate var hostIsReachabile = true
@@ -446,7 +446,7 @@ fileprivate extension SwiftStomp {
 
         DispatchQueue.main.async { [weak self] in
             self?.reconnectScheduler = Timer.scheduledTimer(
-                withTimeInterval: self?.reconnectInterval ?? Default.reconnectInterval,
+                withTimeInterval: self?.reconnectSchedulerInterval ?? Default.reconnectSchedulerInterval,
                 repeats: true
             ) { [weak self] timer in
                 guard let self = self else {
