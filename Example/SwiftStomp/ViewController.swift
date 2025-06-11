@@ -35,8 +35,6 @@ class ViewController: UIViewController {
         self.swiftStomp.enableLogging = true
         self.swiftStomp.delegate = self
         self.swiftStomp.autoReconnect = true
-        
-        self.swiftStomp.enableAutoPing()
     }
     
     private func registerObservers(){

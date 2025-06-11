@@ -7,6 +7,11 @@
 
 import Foundation
 
+private enum StompFrameBodyConstants {
+    /// Null character used by STOMP protocol to terminate a frame
+    static let nullChar = "\u{00}"
+}
+
 /// Represents a generic STOMP frame with a command, headers and body.
 ///
 /// This structure is designed to encapsulate the full definition of a STOMP frame,
@@ -82,7 +87,7 @@ struct StompFrame<T: RawRepresentable> where T.RawValue == String {
         }
         
         // End with NULL terminator
-        frame += StompConstants.nullChar
+        frame += StompFrameBodyConstants.nullChar
         
         return frame
     }
@@ -91,13 +96,6 @@ struct StompFrame<T: RawRepresentable> where T.RawValue == String {
     /// - Parameter frame: A full STOMP string with command, headers, and body
     /// - Throws: If parsing the frame fails
     mutating func deserialize(frame: String) throws {
-        // If the frame consists of only a single newline character "\n", interpret it as a Heartbeat from the server
-        if frame == StompConstants.heartbeatSymbol {
-            name = (StompResponseFrame.serverPing as! T)
-            body = frame
-            return
-        }
-        
         var lines = frame.components(separatedBy: "\n")
         
         // ** Remove first if was empty string

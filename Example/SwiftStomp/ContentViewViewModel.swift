@@ -59,8 +59,6 @@ extension ContentView {
         private func configureSwiftStomp() {
             self.swiftStomp.enableLogging = true
             self.swiftStomp.autoReconnect = true
-            
-            self.swiftStomp.enableAutoPing()
         }
         
         private func subscribeToUpstreams() {
