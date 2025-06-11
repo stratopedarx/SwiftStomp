@@ -153,19 +153,28 @@ public class SwiftStomp: NSObject {
     public var autoReconnect = false
 
     /// Creates a new STOMP client with the given host and optional headers
-    public init (host: URL, headers: [String: String] = [:], httpConnectionHeaders: [String: String] = [:]) {
-        self.host = host
-        self.stompConnectionHeaders = headers
-        self.httpConnectionHeaders = httpConnectionHeaders
-        super.init()
-
-        self.urlSession = URLSession(configuration: makeSessionConfiguration(proxyMode: .disable), delegate: self, delegateQueue: nil)
-        self.initReachability()
+    @available(iOS, deprecated, message: "Use init(host:headers:httpConnectionHeaders:proxyMode:) instead")
+    public convenience init (
+        host: URL,
+        headers: [String: String] = [:],
+        httpConnectionHeaders: [String: String] = [:]
+    ) {
+        self.init(host: host, headers: headers, httpConnectionHeaders: httpConnectionHeaders, proxy: .disable)
     }
 
     /// Creates a new STOMP client with the given host, optional headers and proxy
     @available(iOS 17, *)
-    public init (host: URL, headers: [String: String] = [:], httpConnectionHeaders: [String: String] = [:], proxyMode: DebugProxyMode = .disable) {
+    public convenience init (
+        host: URL,
+        headers: [String: String] = [:],
+        httpConnectionHeaders: [String: String] = [:],
+        proxyMode: DebugProxyMode = .disable
+    ) {
+        self.init(host: host, headers: headers, httpConnectionHeaders: httpConnectionHeaders, proxy: proxyMode)
+    }
+
+    /// Centralized private initializer
+    private init(host: URL, headers: [String: String], httpConnectionHeaders: [String: String], proxy proxyMode: DebugProxyMode) {
         self.host = host
         self.stompConnectionHeaders = headers
         self.httpConnectionHeaders = httpConnectionHeaders
@@ -174,7 +183,7 @@ public class SwiftStomp: NSObject {
         self.urlSession = URLSession(configuration: makeSessionConfiguration(proxyMode: proxyMode), delegate: self, delegateQueue: nil)
         self.initReachability()
     }
-
+    
     deinit {
         disconnect(force: true)
     }
