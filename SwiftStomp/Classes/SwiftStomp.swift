@@ -484,7 +484,11 @@ private extension SwiftStomp {
 
         //** Dispatch STOMP frame
 
-        switch frame.name {
+        guard let frameName = frame.name else {
+            stompLog(type: .info, message: "Stomp: Un-Processable content: \(text)")
+            return
+        }
+        switch frameName {
         case .message:
             stompLog(type: .info, message: "Stomp: Message received: \(String(describing: frame.body))")
 
@@ -576,8 +580,6 @@ private extension SwiftStomp {
                 self.delegate?.onConnect(swiftStomp: self, connectType: .toStomp)
                 self._eventsUpstream.send(.connected(type: .toStomp))
             }
-        default:
-            stompLog(type: .info, message: "Stomp: Un-Processable content: \(text)")
         }
     }
 
@@ -587,7 +589,7 @@ private extension SwiftStomp {
             return
         }
 
-        switch self.status {
+        switch status {
         case .socketConnected:
             if frame.name != .connect{
                 stompLog(type: .info, message: "Unable to send frame \(frame.name.rawValue): Stomp is not connected!")
@@ -596,7 +598,7 @@ private extension SwiftStomp {
         case .socketDisconnected, .connecting:
             stompLog(type: .info, message: "Unable to send frame \(frame.name.rawValue): Invalid state: \(self.status)")
             return
-        default:
+        case .fullyConnected:
             break
         }
 
@@ -724,11 +726,9 @@ extension SwiftStomp {
                 case .string(let text):
                     self?.stompLog(type: .info, message: "Socket: Received text")
                     self?.processReceivedSocketText(text: text)
-                    
                 case .data(let data):
                     self?.stompLog(type: .info, message: "Socket: Received data: \(data.count)")
-                    
-                default:
+                @unknown default:
                     break
                 }
                 
