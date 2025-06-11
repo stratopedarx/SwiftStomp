@@ -729,6 +729,7 @@ extension SwiftStomp {
                 case .data(let data):
                     self?.stompLog(type: .info, message: "Socket: Received data: \(data.count)")
                 @unknown default:
+                    self?.stompLog(type: .socketError, message: "Socket: Received UNKNOWN result")
                     break
                 }
                 
