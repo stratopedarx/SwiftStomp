@@ -22,6 +22,7 @@ import Reachability
 /// ### Key Features:
 /// - Asynchronous message handling using Combine publishers
 /// - Automatic reconnection with retry logic
+/// - Optional automatic heartbeat pings to maintain connection liveness (`toggleAutoHeartbeat(_:)`)
 /// - Network reachability tracking using `Reachability`
 /// - Callback execution on a configurable dispatch queue
 /// - Custom HTTP and STOMP headers during handshake
