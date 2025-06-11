@@ -12,19 +12,6 @@ import Network
 import OSLog
 import Reachability
 
-public enum StompConstants {
-    /// Null character used by STOMP protocol to terminate a frame
-    static let nullChar = "\u{00}"
-
-    /// The heartbeat signal (`\n`) is a single newline character used by both the server and client
-    /// as a lightweight ping mechanism to maintain the STOMP connection's liveness.
-    ///
-    /// - When received alone from the server, it is interpreted as a **server-side heartbeat ping**.
-    /// - The client also **sends** this symbol periodically to the server as part of the heartbeat mechanism.
-    static let heartbeatSymbol = "\n"
-
-}
-
 /// A high-level STOMP (Simple Text Oriented Messaging Protocol) client built on top of WebSockets using `URLSessionWebSocketTask`.
 ///
 /// `SwiftStomp` provides full STOMP 1.1/1.2 protocol support, with built-in connection state management,
@@ -42,6 +29,12 @@ public enum StompConstants {
 /// - Logging support for debugging protocol activity
 public class SwiftStomp: NSObject {
     private enum Constants {
+        /// The heartbeat signal (`\n`) is a single newline character used by both the server and client
+        /// as a lightweight ping mechanism to maintain the STOMP connection's liveness.
+        ///
+        /// - The client **sends** this symbol periodically to the server as part of the heartbeat mechanism.
+        static let heartbeatSymbol = "\n"
+
         static let heartbeatHeaderKey = StompCommonHeader.heartBeat.rawValue
 
         /// The default interval (in milliseconds) for sending heartbeats to the server,
@@ -632,8 +625,6 @@ private extension SwiftStomp {
                 self.delegate?.onConnect(swiftStomp: self, connectType: .toStomp)
                 self._eventsUpstream.send(.connected(type: .toStomp))
             }
-        case .serverPing:
-            stompLog(type: .info, message: "Stomp: Server Ping")
         default:
             stompLog(type: .info, message: "Stomp: Un-Processable content: \(text)")
         }
@@ -730,7 +721,7 @@ private extension SwiftStomp {
     /// This is used to keep the connection alive and inform the server that the client is still active.
     func sendHeartbeat() {
         stompLog(type: .info, message: "Heartbeat sent to server")
-        webSocketTask?.send(.string(StompConstants.heartbeatSymbol)) { error in
+        webSocketTask?.send(.string(Constants.heartbeatSymbol)) { error in
             if let error = error {
                 self.stompLog(type: .stompError, message: "Error sending heartbeat: \(error)")
             }
