@@ -153,7 +153,7 @@ public class SwiftStomp: NSObject {
     public var autoReconnect = false
 
     /// Creates a new STOMP client with the given host and optional headers
-    @available(iOS, deprecated, message: "Use init(host:headers:httpConnectionHeaders:proxyMode:) instead")
+    @available(iOS, deprecated: 17, message: "Use init(host:headers:httpConnectionHeaders:proxyMode:) instead")
     public convenience init (
         host: URL,
         headers: [String: String] = [:],
