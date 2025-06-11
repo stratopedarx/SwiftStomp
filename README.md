@@ -25,8 +25,8 @@
     - [Subscription](#subscription)
     - [Send Message](#send-message)
     - [Connection Status check](#connection-status-check)
-    - [Manual Pinging](#manual-pinging)
-    - [Auto Pinging](#auto-pinging)
+    - [Manual Heartbeat](#manual-heartbeat)
+    - [Auto Heartbeat](#auto-heartbeat)
   - [Test Environment](#test-environment)
   - [Example](#example)
   - [Requirements](#requirements)
@@ -64,15 +64,15 @@ self.swiftStomp.connect() //< Connect
 ### Delegate
 Implement all delegate methods to handle all STOMP events!
 ```swift
-func onConnect(swiftStomp : SwiftStomp, connectType : StompConnectType)
+func onConnect(swiftStomp: SwiftStomp, connectType: StompConnectType)
     
-func onDisconnect(swiftStomp : SwiftStomp, disconnectType : StompDisconnectType)
+func onDisconnect(swiftStomp: SwiftStomp, disconnectType: StompDisconnectType)
 
-func onMessageReceived(swiftStomp: SwiftStomp, message: Any?, messageId: String, destination: String, headers : [String : String])
+func onMessageReceived(swiftStomp: SwiftStomp, message: Any?, messageId: String, destination: String, headers: [String: String])
 
-func onReceipt(swiftStomp : SwiftStomp, receiptId : String)
+func onReceipt(swiftStomp: SwiftStomp, receiptId: String)
 
-func onError(swiftStomp : SwiftStomp, briefDescription : String, fullDescription : String?, receiptId : String?, type : StompErrorType)
+func onError(swiftStomp: SwiftStomp, briefDescription: String, fullDescription: String?, receiptId: String?, type: StompErrorType)
 ```
 
 ### Upstreams
@@ -157,24 +157,23 @@ case .socketDisconnected:
 }
 ```
 
-### Manual Pinging
-You control for sending WebSocket 'Ping' messages. Full signature is as follows:
+### Manual Heartbeat
+You control when to send STOMP heartbeat (\n) messages manually. Full signature is as follows:
 ```swift
-func ping(data: Data = Data(), completion: (() -> Void)? = nil)
+func sendHeartbeat()
 ```
-You will receive 'Pong' message as a response.
+This sends a newline character (\n) to the server, indicating the client is still alive. Useful when you need full manual control over connection liveness.
 
-### Auto Pinging
-If you want to ensure your connection will still alive, you can use 'Auto Ping' feature. Full signature is as follows:
+### Auto Heartbeat
+If you want to ensure your connection stays alive automatically, you can enable the auto heartbeat feature. Full signature is as follows:
 ```swift
-func enableAutoPing(pingInterval: TimeInterval = 10)
+func toggleAutoHeartbeat(_ enabled: Bool)
 ```
-The 'autoPing' feature, will send `ping` command to websocket server, after `pingInterval` time ellapsed from last sent `sendFrame` commands (ex: `connect`, `ack`, `send` ....).
+When enabled, the client will automatically send a STOMP heartbeat (\n) to the server at a negotiated interval. This interval is based on the heart-beat header exchanged with the server during connection and uses the greater of:
 
-> <b><i>Notice:</b> Auto ping is disabled by default. So you have to enable it after you connected to the server. Also please consider, if you disconnect from the server or call `disconnect()` explicitly, you must call `enableAutoPing()` again.</i>
-
-To disable the 'Auto Ping' functionality, use `disableAutoPing()`.
-
+- the client’s desired heartbeat interval
+- the server’s expected interval
+<b><i>Notice:</b> Auto Heartbeat is disabled by default. You must enable it.
 
 ## Test Environment
 This example was test with a <b>[Spring Boot](https://spring.io)</b> websocket server with <b>[RabbitMQ](https://www.rabbitmq.com/)</b> as an external message broker.

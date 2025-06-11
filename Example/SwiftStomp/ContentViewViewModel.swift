@@ -30,7 +30,7 @@ extension ContentView {
         @MainActor
         func connect() {
             if !swiftStomp.isConnected{
-                swiftStomp.connect()
+                swiftStomp.connect(acceptVersion: "1.1,1.2")
             }
         }
         
@@ -59,8 +59,6 @@ extension ContentView {
         private func configureSwiftStomp() {
             self.swiftStomp.enableLogging = true
             self.swiftStomp.autoReconnect = true
-            
-            self.swiftStomp.enableAutoPing()
         }
         
         private func subscribeToUpstreams() {
