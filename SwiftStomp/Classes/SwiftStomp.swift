@@ -50,7 +50,7 @@ public class SwiftStomp: NSObject {
     }
     
     private enum Default {
-        static let reconnectInterval: TimeInterval = 3
+        static let reconnectSchedulerInterval: TimeInterval = 3
     }
 
     /// The WebSocket endpoint (STOMP broker URL)
@@ -71,7 +71,7 @@ public class SwiftStomp: NSObject {
 
     fileprivate var reconnectScheduler: Timer?
     /// Time interval for automatic reconnect attempts. Can be set externally before calling `connect()`.
-    public var reconnectInterval = Default.reconnectInterval
+    public var reconnectSchedulerInterval = Default.reconnectSchedulerInterval
 
     fileprivate var reachability: Reachability?
     fileprivate var hostIsReachabile = true
@@ -153,25 +153,45 @@ public class SwiftStomp: NSObject {
     public var autoReconnect = false
 
     /// Creates a new STOMP client with the given host and optional headers
-    public init (host: URL, headers: [String: String] = [:], httpConnectionHeaders: [String: String] = [:], proxyMode: ProxyMode? = nil) {
+    @available(iOS, deprecated: 17, message: "Use init(host:headers:httpConnectionHeaders:proxyMode:) instead")
+    public convenience init (
+        host: URL,
+        headers: [String: String] = [:],
+        httpConnectionHeaders: [String: String] = [:]
+    ) {
+        self.init(host: host, headers: headers, httpConnectionHeaders: httpConnectionHeaders, proxy: .disable)
+    }
+
+    /// Creates a new STOMP client with the given host, optional headers and proxy
+    @available(iOS 17, *)
+    public convenience init (
+        host: URL,
+        headers: [String: String] = [:],
+        httpConnectionHeaders: [String: String] = [:],
+        proxyMode: DebugProxyMode = .disable
+    ) {
+        self.init(host: host, headers: headers, httpConnectionHeaders: httpConnectionHeaders, proxy: proxyMode)
+    }
+
+    /// Centralized private initializer
+    private init(host: URL, headers: [String: String], httpConnectionHeaders: [String: String], proxy proxyMode: DebugProxyMode) {
         self.host = host
         self.stompConnectionHeaders = headers
         self.httpConnectionHeaders = httpConnectionHeaders
         super.init()
 
-        self.urlSession = URLSession(configuration: createSessionConfiguration(proxyMode: proxyMode), delegate: self, delegateQueue: nil)
+        self.urlSession = URLSession(configuration: makeSessionConfiguration(proxyMode: proxyMode), delegate: self, delegateQueue: nil)
         self.initReachability()
     }
-
+    
     deinit {
         disconnect(force: true)
     }
 
-    private func createSessionConfiguration(proxyMode: ProxyMode?) -> URLSessionConfiguration {
+    private func makeSessionConfiguration(proxyMode: DebugProxyMode) -> URLSessionConfiguration {
         let sessionConfig = URLSessionConfiguration.default
-
-        if #available(iOS 17.0, *),
-           let proxyMode = proxyMode {
+        
+        if #available(iOS 17.0, *) {
             switch proxyMode {
             case .proxyman(let host, let port):
                 let socksv5Proxy = NWEndpoint.hostPort(
@@ -180,6 +200,8 @@ public class SwiftStomp: NSObject {
                 )
                 let proxyConfig = ProxyConfiguration(socksv5Proxy: socksv5Proxy)
                 sessionConfig.proxyConfigurations = [proxyConfig]
+            case .disable:
+                break
             }
         }
 
@@ -446,7 +468,7 @@ fileprivate extension SwiftStomp {
 
         DispatchQueue.main.async { [weak self] in
             self?.reconnectScheduler = Timer.scheduledTimer(
-                withTimeInterval: self?.reconnectInterval ?? Default.reconnectInterval,
+                withTimeInterval: self?.reconnectSchedulerInterval ?? Default.reconnectSchedulerInterval,
                 repeats: true
             ) { [weak self] timer in
                 guard let self = self else {
@@ -884,11 +906,13 @@ public protocol SwiftStompDelegate: AnyObject {
     func onError(swiftStomp: SwiftStomp, briefDescription: String, fullDescription: String?, receiptId: String?, type: StompErrorType)
 }
 
-// MARK: - ProxyMode
+// MARK: - DebugProxyMode
 
 /// Defines proxy configuration modes for the SwiftStomp client.
 /// Used to optionally route network traffic through a proxy server, such as for debugging WebSocket connections.
-public enum ProxyMode {
+public enum DebugProxyMode {
     /// [Capture and debug Websocket from iOS](https://docs.proxyman.com/advanced-features/websocket)
     case proxyman(host: String = "localhost", port: Int16 = 8889)
+    /// Disables proxying
+    case disable
 }
