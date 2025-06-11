@@ -15,14 +15,13 @@ import Reachability
 /// A high-level STOMP (Simple Text Oriented Messaging Protocol) client built on top of WebSockets using `URLSessionWebSocketTask`.
 ///
 /// `SwiftStomp` provides full STOMP 1.1/1.2 protocol support, with built-in connection state management,
-/// reconnection logic, ping/heartbeat monitoring, and message/event/receipt publishing streams via Combine.
+/// reconnection logic, heartbeat monitoring, and message/event/receipt publishing streams via Combine.
 ///
 /// This class is designed for robust messaging scenarios in iOS/macOS apps using STOMP brokers like ActiveMQ, RabbitMQ, or similar.
 ///
 /// ### Key Features:
 /// - Asynchronous message handling using Combine publishers
 /// - Automatic reconnection with retry logic
-/// - Optional auto-ping with configurable interval
 /// - Network reachability tracking using `Reachability`
 /// - Callback execution on a configurable dispatch queue
 /// - Custom HTTP and STOMP headers during handshake
@@ -30,7 +29,7 @@ import Reachability
 public class SwiftStomp: NSObject {
     private enum Constants {
         /// The heartbeat signal (`\n`) is a single newline character used by both the server and client
-        /// as a lightweight ping mechanism to maintain the STOMP connection's liveness.
+        /// as a lightweight heartbeat mechanism to maintain the STOMP connection's liveness.
         ///
         /// - The client **sends** this symbol periodically to the server as part of the heartbeat mechanism.
         static let heartbeatSymbol = "\n"
@@ -90,12 +89,6 @@ public class SwiftStomp: NSObject {
 
     /// The timer responsible for triggering automatic heartbeat pings from the client to the server
     private var heartbeatTimer: Timer?
-
-    // MARK: Auto ping peroperties
-
-    fileprivate var pingTimer: Timer?
-    fileprivate var pingInterval: TimeInterval = 10 //< 10 Seconds
-    fileprivate var autoPingEnabled = false
 
     /// Delegate for handling STOMP client events
     public weak var delegate: SwiftStompDelegate?
@@ -255,7 +248,6 @@ public extension SwiftStomp {
     func disconnect(force: Bool = false) {
 
         self.autoReconnect = false
-        self.disableAutoPing()
         self.invalidateConnector()
 
         if !force{ //< Send disconnect first over STOMP
@@ -359,48 +351,6 @@ public extension SwiftStomp {
             .get
 
         self.sendFrame(frame: StompFrame(name: .abort, headers: headers))
-    }
-
-
-    /// Send ping command to keep connection alive
-    /// - Parameters:
-    ///   - data: Date to send over Web socket
-    ///   - completion: Completion block
-    func ping(data: Data = Data(), completion: (() -> Void)? = nil) {
-
-        //** Check socket status
-        guard let webSocketTask, self.status == .fullyConnected || self.status == .socketConnected else {
-            self.stompLog(type: .info, message: "Stomp: Unable to send `ping`. Socket is not connected!")
-            return
-        }
-
-        webSocketTask.sendPing() { _ in
-            completion?()
-        }
-
-        self.stompLog(type: .info, message: "Stomp: Ping sent!")
-
-        //** Reset ping timer
-        self.resetPingTimer()
-    }
-
-
-    /// Enable auto ping command to ensure connection will keep alive and prevent connection to stay idle
-    /// - Notice: Please be care if you used `disconnect`, you have to re-enable the timer again.
-    /// - Parameter pingInterval: Ping command send interval
-    func enableAutoPing(pingInterval: TimeInterval = 10) {
-        self.pingInterval = pingInterval
-        self.autoPingEnabled = true
-
-        //** Reset ping timer
-        self.resetPingTimer()
-    }
-
-
-    /// Disable auto ping function
-    func disableAutoPing() {
-        self.autoPingEnabled = false
-        self.pingTimer?.invalidate()
     }
 
     /// Toggles automatic heartbeat pings to the server.
@@ -660,29 +610,6 @@ private extension SwiftStomp {
 
             completion?()
         }
-
-        //** Reset ping timer
-        self.resetPingTimer()
-    }
-
-    func resetPingTimer() {
-        if !autoPingEnabled{
-            return
-        }
-
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-
-            //** Invalidate if timer is valid
-            if let t = self.pingTimer, t.isValid{
-                t.invalidate()
-            }
-
-            //** Schedule the ping timer
-            self.pingTimer = Timer.scheduledTimer(withTimeInterval: self.pingInterval, repeats: true) { [weak self] _ in
-                self?.ping()
-            }
-        }
     }
 
     /// Resets the heartbeat timer if auto-heartbeat is enabled and the connection status is `.fullyConnected`.
@@ -860,7 +787,6 @@ extension SwiftStomp: URLSessionWebSocketDelegate {
     }
 
     private func handleDisconnect() {
-        pingTimer?.invalidate()
         heartbeatTimer?.invalidate()
         self.invalidateConnector()
 
