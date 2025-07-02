@@ -22,7 +22,7 @@ import Reachability
 /// ### Key Features:
 /// - Asynchronous message handling using Combine publishers
 /// - Automatic reconnection with retry logic
-/// - Optional automatic heartbeat pings to maintain connection liveness (`toggleAutoHeartbeat(_:)`)
+/// - Optional automatic heartbeat pings to maintain connection liveness
 /// - Network reachability tracking using `Reachability`
 /// - Callback execution on a configurable dispatch queue
 /// - Custom HTTP and STOMP headers during handshake
@@ -63,8 +63,8 @@ public class SwiftStomp: NSObject {
     fileprivate var status: StompConnectionStatus = .socketDisconnected
 
     fileprivate var reconnectScheduler: Timer?
-    /// Time interval for automatic reconnect attempts. Can be set externally before calling `connect()`.
-    public var reconnectSchedulerInterval = Default.reconnectSchedulerInterval
+    /// Time interval for automatic reconnect attempts
+    private let reconnectSchedulerInterval: TimeInterval
 
     fileprivate var reachability: Reachability?
     fileprivate var hostIsReachabile = true
@@ -72,7 +72,7 @@ public class SwiftStomp: NSObject {
     // MARK: Heartbeat peroperties
 
     /// Determines whether the client should automatically send heartbeat pings to the server using a timer
-    private var isAutoHeartbeatEnable = false
+    private let isAutoHeartbeatEnabled: Bool
 
     /// The interval (in seconds) at which the client *wants* to send heartbeat pings to the server.
     /// This value is negotiated during the STOMP handshake.
@@ -114,7 +114,7 @@ public class SwiftStomp: NSObject {
 
     // MARK: Configurations
     
-    public var enableLogging = false
+    private let isLoggingEnabled: Bool
     public var isConnected: Bool {
         return self.status == .fullyConnected
     }
@@ -144,9 +144,20 @@ public class SwiftStomp: NSObject {
     public convenience init (
         host: URL,
         headers: [String: String] = [:],
-        httpConnectionHeaders: [String: String] = [:]
+        httpConnectionHeaders: [String: String] = [:],
+        isAutoHeartbeatEnabled: Bool = false,
+        isLoggingEnabled: Bool = false,
+        reconnectSchedulerInterval: TimeInterval? = nil
     ) {
-        self.init(host: host, headers: headers, httpConnectionHeaders: httpConnectionHeaders, proxy: .disable)
+        self.init(
+            host: host,
+            headers: headers,
+            httpConnectionHeaders: httpConnectionHeaders,
+            proxy: .disable,
+            isAutoHeartbeatEnabled: isAutoHeartbeatEnabled,
+            isLoggingEnabled: isLoggingEnabled,
+            reconnectSchedulerInterval: reconnectSchedulerInterval
+        )
     }
 
     /// Creates a new STOMP client with the given host, optional headers and proxy
@@ -155,20 +166,45 @@ public class SwiftStomp: NSObject {
         host: URL,
         headers: [String: String] = [:],
         httpConnectionHeaders: [String: String] = [:],
-        proxyMode: DebugProxyMode = .disable
+        proxyMode: DebugProxyMode = .disable,
+        isAutoHeartbeatEnabled: Bool = false,
+        isLoggingEnabled: Bool = false,
+        reconnectSchedulerInterval: TimeInterval? = nil
     ) {
-        self.init(host: host, headers: headers, httpConnectionHeaders: httpConnectionHeaders, proxy: proxyMode)
+        self.init(
+            host: host,
+            headers: headers,
+            httpConnectionHeaders: httpConnectionHeaders,
+            proxy: proxyMode,
+            isAutoHeartbeatEnabled: isAutoHeartbeatEnabled,
+            isLoggingEnabled: isLoggingEnabled,
+            reconnectSchedulerInterval: reconnectSchedulerInterval
+        )
     }
 
     /// Centralized private initializer
-    private init(host: URL, headers: [String: String], httpConnectionHeaders: [String: String], proxy proxyMode: DebugProxyMode) {
+    private init(
+        host: URL,
+        headers: [String: String],
+        httpConnectionHeaders: [String: String],
+        proxy proxyMode: DebugProxyMode,
+        isAutoHeartbeatEnabled: Bool,
+        isLoggingEnabled: Bool,
+        reconnectSchedulerInterval: TimeInterval?
+    ) {
         self.host = host
         self.stompConnectionHeaders = headers
         self.httpConnectionHeaders = httpConnectionHeaders
+        self.isAutoHeartbeatEnabled = isAutoHeartbeatEnabled
+        self.isLoggingEnabled = isLoggingEnabled
+        self.reconnectSchedulerInterval = reconnectSchedulerInterval ?? Default.reconnectSchedulerInterval
+
         super.init()
 
         self.urlSession = URLSession(configuration: makeSessionConfiguration(proxyMode: proxyMode), delegate: self, delegateQueue: nil)
         self.initReachability()
+        self.saveHeartbeatClientSettings(connectedHeaders: stompConnectionHeaders)
+        self.toggleAutoHeartbeat(isAutoHeartbeatEnabled)
     }
     
     deinit {
@@ -353,23 +389,12 @@ public extension SwiftStomp {
 
         self.sendFrame(frame: StompFrame(name: .abort, headers: headers))
     }
-
-    /// Toggles automatic heartbeat pings to the server.
-    /// If enabled, a timer sends heartbeats at the negotiated interval.
-    func toggleAutoHeartbeat(_ enabled: Bool) {
-        stompLog(type: .info, message: "Auto Heartbeat sending set to: \(enabled)")
-        isAutoHeartbeatEnable = enabled
-        if !enabled {
-            heartbeatTimer?.invalidate()
-        }
-        resetHeartbeatTimer()
-    }
 }
 
 /// Helper functions
-fileprivate extension SwiftStomp {
+private extension SwiftStomp {
     func stompLog(type: StompLogType, message: String) {
-        guard enableLogging else { return }
+        guard isLoggingEnabled else { return }
 
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
@@ -441,6 +466,15 @@ fileprivate extension SwiftStomp {
         self.reachability?.stopNotifier()
     }
 
+    /// Toggles automatic heartbeat pings to the server.
+    /// If enabled, a timer sends heartbeats at the negotiated interval.
+    func toggleAutoHeartbeat(_ enabled: Bool) {
+        stompLog(type: .info, message: "Auto Heartbeat sending set to: \(enabled)")
+        if !enabled {
+            heartbeatTimer?.invalidate()
+        }
+        resetHeartbeatTimer()
+    }
 }
 
 /// Back-Operating functions
@@ -456,8 +490,6 @@ private extension SwiftStomp {
         for (hKey, hVal) in stompConnectionHeaders{
             headers[hKey] = hVal
         }
-
-        saveHeartbeatClientSettings(connectedHeaders: stompConnectionHeaders)
 
         self.sendFrame(frame: StompFrame(name: .connect, headers: headers))
     }
@@ -618,7 +650,7 @@ private extension SwiftStomp {
     /// Resets the heartbeat timer if auto-heartbeat is enabled and the connection status is `.fullyConnected`.
     /// Ensures only one valid timer is active. When triggered, the timer will send heartbeat signals at a regular interval.
     func resetHeartbeatTimer() {
-        guard isAutoHeartbeatEnable else {
+        guard isAutoHeartbeatEnabled else {
             stompLog(type: .info, message: "Heartbeat timer not restarted because auto-heartbeat is disabled")
             return
         }
